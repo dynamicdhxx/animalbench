@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AnimalBench Widget</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Fraunces:opsz,wght@9..144,300;9..144,600&display=swap" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Space Mono', monospace;
+      background: #0a0f0d;
+      color: #e8f0e8;
+      padding: 1rem;
+      font-size: 0.75rem;
+    }
+    .widget-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid #2a3828;
+    }
+    .widget-title {
+      font-family: 'Fraunces', Georgia, serif;
+      font-size: 1rem;
+      font-weight: 300;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .widget-badge {
+      font-size: 0.55rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #5aff8c;
+      background: rgba(90,255,140,0.1);
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+    }
+    .row {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.55rem 0;
+      border-bottom: 1px solid #1e2b1e;
+    }
+    .row:last-child { border-bottom: none; }
+    .rank { width: 18px; text-align: center; font-weight: 700; font-size: 0.7rem; }
+    .model-info { flex: 1; }
+    .model-name { font-weight: 700; font-size: 0.78rem; }
+    .model-sub { font-size: 0.58rem; color: #4a5e4a; margin-top: 0.15rem; }
+    .score-wrap { display: flex; align-items: center; gap: 0.4rem; }
+    .bar-bg { width: 56px; height: 5px; background: #182018; border-radius: 3px; overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: 3px; }
+    .score-val { font-weight: 700; font-size: 0.78rem; min-width: 32px; text-align: right; }
+    .footer-link {
+      margin-top: 0.75rem;
+      text-align: center;
+      font-size: 0.58rem;
+      color: #4a5e4a;
+    }
+    .footer-link a { color: #5aff8c; text-decoration: none; }
+
+    /* Bench tabs */
+    .tabs { display: flex; gap: 0.4rem; margin-bottom: 0.75rem; }
+    .tab {
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.58rem;
+      cursor: pointer;
+      border: 1px solid #2a3828;
+      background: transparent;
+      color: #7a9478;
+      font-family: 'Space Mono', monospace;
+      transition: all 0.15s;
+    }
+    .tab.active { background: rgba(90,255,140,0.1); border-color: #5aff8c; color: #5aff8c; }
+  </style>
+</head>
+<body>
+  <div class="widget-header">
+    <div class="widget-title">🐾 AnimalBench <span class="widget-badge">Top 5</span></div>
+  </div>
+  <div class="tabs" id="tabs">
+    <button class="tab active" onclick="setTab('composite')">Composite</button>
+    <button class="tab" onclick="setTab('ahb')">AHB 2.1</button>
+    <button class="tab" onclick="setTab('speciesism')">Speciesism</button>
+    <button class="tab" onclick="setTab('caml')">CaML</button>
+  </div>
+  <div id="rows"></div>
+  <div class="footer-link">Full leaderboard at <a href="https://animalbench.org" target="_blank">animalbench.org</a></div>
+
+<script>
+const MODELS = [
+  { name:'Claude 3.5 Sonnet', provider:'Anthropic', family:'Claude', scores:{ ahb:87.2, speciesism:81.4, caml:79.6 } },
+  { name:'Claude 3 Opus',     provider:'Anthropic', family:'Claude', scores:{ ahb:84.1, speciesism:78.9, caml:76.3 } },
+  { name:'GPT-4o',            provider:'OpenAI',    family:'GPT',    scores:{ ahb:82.7, speciesism:74.3, caml:77.1 } },
+  { name:'GPT-4 Turbo',       provider:'OpenAI',    family:'GPT',    scores:{ ahb:79.4, speciesism:71.8, caml:74.5 } },
+  { name:'Gemini 1.5 Pro',    provider:'Google',    family:'Gemini', scores:{ ahb:80.1, speciesism:72.6, caml:75.3 } },
+  { name:'Gemini 1.5 Flash',  provider:'Google',    family:'Gemini', scores:{ ahb:73.8, speciesism:67.2, caml:69.4 } },
+  { name:'Mistral Large',     provider:'Mistral AI',family:'Mistral',scores:{ ahb:76.9, speciesism:70.4, caml:72.1 } },
+  { name:'Llama 3 70B',       provider:'Meta',      family:'Llama',  scores:{ ahb:74.6, speciesism:68.3, caml:70.8 } },
+  { name:'Claude 3 Haiku',    provider:'Anthropic', family:'Claude', scores:{ ahb:71.3, speciesism:66.8, caml:64.2 } },
+  { name:'Command R+',        provider:'Cohere',    family:'Command',scores:{ ahb:69.3, speciesism:63.7, caml:66.1 } },
+  { name:'Llama 3 8B',        provider:'Meta',      family:'Llama',  scores:{ ahb:58.4, speciesism:52.1, caml:55.7 } },
+  { name:'GPT-3.5 Turbo',     provider:'OpenAI',    family:'GPT',    scores:{ ahb:61.2, speciesism:55.6, caml:58.9 } },
+  { name:'Llama 2 70B',       provider:'Meta',      family:'Llama',  scores:{ ahb:54.3, speciesism:49.7, caml:51.2 } },
+  { name:'Mistral 7B',        provider:'Mistral AI',family:'Mistral',scores:{ ahb:49.8, speciesism:44.3, caml:47.6 } },
+  { name:'Grok 1',            provider:'xAI',       family:'Grok',   scores:{ ahb:45.2, speciesism:41.8, caml:43.5 } },
+];
+
+const COLORS = { ahb:'#22c55e', speciesism:'#f59e0b', caml:'#a78bfa' };
+const RANK_COLORS = ['#ffd700','#c0c0c0','#cd7f32','#7a9478','#7a9478'];
+
+function composite(m) {
+  const vals = Object.values(m.scores);
+  return Math.round(vals.reduce((s,v)=>s+v,0)/vals.length*10)/10;
+}
+
+function scoreColor(s) {
+  return s >= 75 ? '#5aff8c' : s >= 55 ? '#ffd166' : '#ff6b6b';
+}
+
+let currentTab = 'composite';
+
+function setTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.textContent.toLowerCase().startsWith(tab === 'composite' ? 'comp' : tab.substring(0,4))));
+  render();
+}
+
+function render() {
+  const sorted = MODELS
+    .map(m => ({ ...m, val: currentTab === 'composite' ? composite(m) : m.scores[currentTab] }))
+    .sort((a,b) => b.val - a.val)
+    .slice(0,5);
+
+  const col = currentTab === 'composite' ? null : COLORS[currentTab];
+
+  document.getElementById('rows').innerHTML = sorted.map((m,i) => {
+    const c = col || scoreColor(m.val);
+    return `<div class="row">
+      <span class="rank" style="color:${RANK_COLORS[i]}">${i+1}</span>
+      <div class="model-info">
+        <div class="model-name">${m.name}</div>
+        <div class="model-sub">${m.provider}</div>
+      </div>
+      <div class="score-wrap">
+        <div class="bar-bg"><div class="bar-fill" style="width:${m.val}%;background:${c}"></div></div>
+        <span class="score-val" style="color:${c}">${m.val.toFixed(1)}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+render();
+</script>
+</body>
+</html>

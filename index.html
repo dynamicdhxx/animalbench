@@ -1,0 +1,1190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AnimalBench — AI Animal Welfare Leaderboard</title>
+  <meta name="description" content="Compare how AI models perform across animal welfare benchmarks. Rankings, composite scores, filtering, and CSV export for researchers." />
+  <meta property="og:title" content="AnimalBench Leaderboard" />
+  <meta property="og:description" content="The single place to compare AI model performance across animal welfare benchmarks." />
+  <meta property="og:type" content="website" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,600;1,9..144,300&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Reset & Base ───────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    :root {
+      --bg: #0a0f0d;
+      --surface: #111810;
+      --surface2: #182018;
+      --border: #2a3828;
+      --border2: #1e2b1e;
+      --text: #e8f0e8;
+      --text-muted: #7a9478;
+      --text-dim: #4a5e4a;
+      --accent: #5aff8c;
+      --accent2: #a8ff6e;
+      --amber: #ffd166;
+      --purple: #c084fc;
+      --red: #ff6b6b;
+      --ahb: #22c55e;
+      --spec: #f59e0b;
+      --caml: #a78bfa;
+      --rank1: #ffd700;
+      --rank2: #c0c0c0;
+      --rank3: #cd7f32;
+      --mono: 'Space Mono', monospace;
+      --serif: 'Fraunces', Georgia, serif;
+    }
+
+    html { scroll-behavior: smooth; }
+    
+    body {
+      font-family: var(--mono);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Noise texture overlay ──────────────────── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 1000;
+      opacity: 0.4;
+    }
+
+    /* ── Layout ─────────────────────────────────── */
+    .container { max-width: 1200px; margin: 0 auto; padding: 0 1.5rem; }
+
+    /* ── Header ─────────────────────────────────── */
+    header {
+      border-bottom: 1px solid var(--border);
+      padding: 1rem 0;
+      position: sticky;
+      top: 0;
+      background: rgba(10, 15, 13, 0.95);
+      backdrop-filter: blur(12px);
+      z-index: 100;
+    }
+
+    .header-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      text-decoration: none;
+    }
+
+    .logo-icon {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+      flex-shrink: 0;
+    }
+
+    .logo-text {
+      font-family: var(--serif);
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--text);
+      letter-spacing: -0.01em;
+    }
+
+    .logo-tag {
+      font-size: 0.6rem;
+      color: var(--accent);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      font-family: var(--mono);
+    }
+
+    .header-actions { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
+
+    /* ── Buttons ────────────────────────────────── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      text-decoration: none;
+      border: none;
+      white-space: nowrap;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #0a0f0d;
+      font-weight: 700;
+    }
+    .btn-primary:hover { background: var(--accent2); transform: translateY(-1px); }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+    }
+    .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+    .btn-outline {
+      background: transparent;
+      color: var(--accent);
+      border: 1px solid var(--accent);
+    }
+    .btn-outline:hover { background: rgba(90, 255, 140, 0.08); }
+
+    /* ── Hero ───────────────────────────────────── */
+    .hero {
+      padding: 5rem 0 3rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero::after {
+      content: '';
+      position: absolute;
+      top: -40%;
+      right: -10%;
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(90,255,140,0.04) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .hero-eyebrow {
+      font-size: 0.7rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 1rem;
+    }
+
+    .hero-title {
+      font-family: var(--serif);
+      font-size: clamp(2.5rem, 6vw, 4.5rem);
+      font-weight: 300;
+      line-height: 1.05;
+      letter-spacing: -0.02em;
+      color: var(--text);
+      margin-bottom: 1.5rem;
+    }
+
+    .hero-title em {
+      font-style: italic;
+      color: var(--accent);
+    }
+
+    .hero-desc {
+      font-size: 0.875rem;
+      line-height: 1.8;
+      color: var(--text-muted);
+      max-width: 52ch;
+      margin-bottom: 2rem;
+    }
+
+    .hero-stats {
+      display: flex;
+      gap: 2rem;
+      flex-wrap: wrap;
+      margin-top: 2.5rem;
+      padding-top: 2rem;
+      border-top: 1px solid var(--border2);
+    }
+
+    .stat { display: flex; flex-direction: column; gap: 0.25rem; }
+    .stat-num {
+      font-family: var(--serif);
+      font-size: 2rem;
+      font-weight: 600;
+      color: var(--accent);
+      line-height: 1;
+    }
+    .stat-label { font-size: 0.7rem; color: var(--text-dim); letter-spacing: 0.1em; text-transform: uppercase; }
+
+    /* ── Benchmark pills ────────────────────────── */
+    .bench-pills {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-bottom: 2rem;
+    }
+
+    .bench-pill {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.35rem 0.75rem;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all 0.2s;
+      font-family: var(--mono);
+      background: var(--surface2);
+    }
+
+    .bench-pill .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .bench-pill.active { border-color: currentColor; }
+    .bench-pill:hover { opacity: 0.85; }
+
+    .bench-pill[data-bench="composite"] { color: var(--accent); }
+    .bench-pill[data-bench="ahb"] { color: var(--ahb); }
+    .bench-pill[data-bench="speciesism"] { color: var(--spec); }
+    .bench-pill[data-bench="caml"] { color: var(--caml); }
+
+    /* ── Filters ────────────────────────────────── */
+    .filters-bar {
+      display: flex;
+      gap: 0.75rem;
+      align-items: center;
+      flex-wrap: wrap;
+      padding: 1rem 1.25rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin-bottom: 1.5rem;
+    }
+
+    .filter-label { font-size: 0.7rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.1em; white-space: nowrap; }
+
+    select, input {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.4rem 0.75rem;
+      border-radius: 6px;
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      cursor: pointer;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    select:hover, select:focus, input:hover, input:focus { border-color: var(--accent); }
+
+    .filter-sep { width: 1px; height: 24px; background: var(--border); flex-shrink: 0; }
+
+    /* ── Leaderboard table ──────────────────────── */
+    .table-wrap { overflow-x: auto; border-radius: 10px; border: 1px solid var(--border); }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8rem;
+    }
+
+    thead th {
+      padding: 0.75rem 1rem;
+      text-align: left;
+      font-size: 0.65rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+      cursor: pointer;
+      user-select: none;
+    }
+    thead th:hover { color: var(--accent); }
+    thead th.sorted { color: var(--accent); }
+
+    tbody tr {
+      border-bottom: 1px solid var(--border2);
+      transition: background 0.1s;
+    }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: var(--surface2); }
+
+    tbody td { padding: 0.85rem 1rem; vertical-align: middle; }
+
+    .rank-cell { width: 50px; text-align: center; }
+    .rank-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      font-size: 0.7rem;
+      font-weight: 700;
+    }
+    .rank-1 { background: rgba(255,215,0,0.15); color: var(--rank1); }
+    .rank-2 { background: rgba(192,192,192,0.15); color: var(--rank2); }
+    .rank-3 { background: rgba(205,127,50,0.15); color: var(--rank3); }
+    .rank-n { background: var(--surface2); color: var(--text-dim); }
+
+    .model-name { font-weight: 700; color: var(--text); }
+    .model-meta { font-size: 0.65rem; color: var(--text-dim); margin-top: 0.2rem; }
+
+    .family-tag {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.62rem;
+      letter-spacing: 0.06em;
+      background: var(--surface2);
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+    }
+
+    .score-cell { text-align: right; min-width: 90px; }
+
+    .score-bar-wrap { display: flex; align-items: center; gap: 0.6rem; justify-content: flex-end; }
+    .score-num {
+      font-weight: 700;
+      font-size: 0.9rem;
+      min-width: 40px;
+      text-align: right;
+    }
+    .score-bar-bg {
+      width: 80px;
+      height: 6px;
+      background: var(--surface2);
+      border-radius: 3px;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    .score-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .est-dot {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--amber);
+      margin-left: 4px;
+      vertical-align: middle;
+      cursor: help;
+    }
+
+    .na-score { color: var(--text-dim); font-size: 0.7rem; }
+
+    /* ── Score colors ───────────────────────────── */
+    .s-high { color: var(--accent); }
+    .s-mid  { color: var(--amber); }
+    .s-low  { color: var(--red); }
+
+    /* ── Composite badge ────────────────────────── */
+    .composite-score {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.25rem 0.6rem;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 0.9rem;
+    }
+
+    /* ── Section headings ───────────────────────── */
+    .section-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 1rem;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    .section-title {
+      font-family: var(--serif);
+      font-size: 1.4rem;
+      font-weight: 300;
+      color: var(--text);
+    }
+    .section-count { font-size: 0.7rem; color: var(--text-dim); }
+
+    /* ── Benchmark info cards ───────────────────── */
+    .bench-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1rem;
+      margin: 3rem 0;
+    }
+
+    .bench-card {
+      padding: 1.5rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.2s;
+    }
+    .bench-card:hover { border-color: var(--accent); }
+    .bench-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+    }
+    .bench-card[data-bench="ahb"]::before { background: var(--ahb); }
+    .bench-card[data-bench="speciesism"]::before { background: var(--spec); }
+    .bench-card[data-bench="caml"]::before { background: var(--caml); }
+
+    .bench-card-name {
+      font-family: var(--serif);
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+    }
+    .bench-card-full { font-size: 0.7rem; color: var(--text-dim); margin-bottom: 0.75rem; letter-spacing: 0.04em; }
+    .bench-card-desc { font-size: 0.78rem; color: var(--text-muted); line-height: 1.7; margin-bottom: 1rem; }
+    .bench-card-metric {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-dim);
+    }
+
+    /* ── Embed widget section ───────────────────── */
+    .embed-section {
+      padding: 2.5rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      margin: 3rem 0;
+    }
+
+    .embed-title {
+      font-family: var(--serif);
+      font-size: 1.3rem;
+      font-weight: 300;
+      margin-bottom: 0.5rem;
+    }
+
+    .embed-desc { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1.5rem; line-height: 1.7; }
+
+    .code-block {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      font-size: 0.73rem;
+      color: var(--accent);
+      line-height: 1.6;
+      overflow-x: auto;
+      position: relative;
+      margin-bottom: 1rem;
+    }
+
+    .copy-btn {
+      position: absolute;
+      top: 0.5rem;
+      right: 0.5rem;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 0.25rem 0.6rem;
+      border-radius: 4px;
+      font-size: 0.65rem;
+      cursor: pointer;
+      font-family: var(--mono);
+      transition: all 0.15s;
+    }
+    .copy-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+    /* ── Footer ─────────────────────────────────── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 2rem 0;
+      margin-top: 4rem;
+      color: var(--text-dim);
+      font-size: 0.72rem;
+      line-height: 1.8;
+    }
+
+    .footer-inner {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 2rem;
+      flex-wrap: wrap;
+    }
+
+    .footer-links { display: flex; gap: 1.25rem; flex-wrap: wrap; margin-top: 0.5rem; }
+    .footer-links a { color: var(--text-dim); text-decoration: none; }
+    .footer-links a:hover { color: var(--accent); }
+
+    .legend { display: flex; align-items: center; gap: 0.5rem; font-size: 0.65rem; color: var(--text-dim); }
+    .legend .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--amber); display: inline-block; }
+
+    /* ── Tooltip ────────────────────────────────── */
+    .tooltip-wrap { position: relative; display: inline-block; }
+    .tooltip {
+      display: none;
+      position: absolute;
+      bottom: calc(100% + 6px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 0.4rem 0.7rem;
+      border-radius: 6px;
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      white-space: nowrap;
+      z-index: 10;
+      pointer-events: none;
+    }
+    .tooltip-wrap:hover .tooltip { display: block; }
+
+    /* ── Empty state ────────────────────────────── */
+    .empty-state {
+      text-align: center;
+      padding: 3rem;
+      color: var(--text-dim);
+      font-size: 0.8rem;
+    }
+
+    /* ── Responsive ─────────────────────────────── */
+    @media (max-width: 768px) {
+      .hero { padding: 3rem 0 2rem; }
+      .hero-stats { gap: 1.25rem; }
+      .filters-bar { flex-direction: column; align-items: flex-start; }
+      .filter-sep { display: none; }
+      .score-bar-bg { display: none; }
+      .header-actions .btn-ghost { display: none; }
+      .embed-section { padding: 1.5rem; }
+    }
+
+    /* ── Animations ─────────────────────────────── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .fade-up { animation: fadeUp 0.5s ease forwards; }
+    tbody tr { animation: fadeUp 0.3s ease forwards; }
+
+    /* ── Compare mode ───────────────────────────── */
+    .compare-bar {
+      position: fixed;
+      bottom: 1.5rem;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--surface);
+      border: 1px solid var(--accent);
+      border-radius: 12px;
+      padding: 0.75rem 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      font-size: 0.75rem;
+      z-index: 200;
+      box-shadow: 0 8px 32px rgba(90,255,140,0.12);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+      white-space: nowrap;
+    }
+    .compare-bar.visible { opacity: 1; pointer-events: all; }
+    .compare-bar-names { color: var(--accent); font-weight: 700; }
+
+    /* ── Type badge ─────────────────────────────── */
+    .type-badge {
+      font-size: 0.58rem;
+      padding: 0.1rem 0.4rem;
+      border-radius: 3px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .type-open { background: rgba(90,255,140,0.1); color: var(--accent); }
+    .type-closed { background: rgba(168,139,250,0.1); color: var(--purple); }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ─────────────────────────────────────────────── -->
+<header>
+  <div class="container header-inner">
+    <a href="#" class="logo">
+      <div class="logo-icon">🐾</div>
+      <div>
+        <div class="logo-text">AnimalBench</div>
+        <div class="logo-tag">AI Welfare Leaderboard</div>
+      </div>
+    </a>
+    <div class="header-actions">
+      <a href="https://github.com/yourusername/animalbench" target="_blank" class="btn btn-ghost">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+        GitHub
+      </a>
+      <button class="btn btn-primary" onclick="exportCSV()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+        Export CSV
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- ── Hero ───────────────────────────────────────────────── -->
+<section class="hero">
+  <div class="container">
+    <p class="hero-eyebrow fade-up">Open Evaluation / Animal Welfare AI</p>
+    <h1 class="hero-title fade-up">How do AI models<br>treat <em>animals?</em></h1>
+    <p class="hero-desc fade-up">
+      AnimalBench aggregates results from three peer-reviewed benchmarks measuring animal welfare bias in large language models. Compare rankings, explore composite scores, and download data for your research.
+    </p>
+    <div style="display:flex;gap:0.75rem;flex-wrap:wrap;" class="fade-up">
+      <button class="btn btn-primary" onclick="document.getElementById('leaderboard').scrollIntoView({behavior:'smooth'})">
+        View Rankings ↓
+      </button>
+      <button class="btn btn-outline" onclick="document.getElementById('benchmarks').scrollIntoView({behavior:'smooth'})">
+        About the Benchmarks
+      </button>
+    </div>
+    <div class="hero-stats fade-up">
+      <div class="stat">
+        <span class="stat-num" id="stat-models">15</span>
+        <span class="stat-label">Models tracked</span>
+      </div>
+      <div class="stat">
+        <span class="stat-num">3</span>
+        <span class="stat-label">Benchmarks</span>
+      </div>
+      <div class="stat">
+        <span class="stat-num" id="stat-top">—</span>
+        <span class="stat-label">Top performer</span>
+      </div>
+      <div class="stat">
+        <span class="stat-num" id="stat-avg">—</span>
+        <span class="stat-label">Avg composite</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Leaderboard ─────────────────────────────────────────── -->
+<section id="leaderboard" class="container" style="margin-top:1rem;">
+
+  <!-- Benchmark selector -->
+  <div class="bench-pills" id="benchPills">
+    <button class="bench-pill active" data-bench="composite" onclick="selectBench('composite')">
+      <span class="dot" style="background:var(--accent)"></span> Composite
+    </button>
+    <button class="bench-pill" data-bench="ahb" onclick="selectBench('ahb')">
+      <span class="dot" style="background:var(--ahb)"></span> AHB 2.1
+    </button>
+    <button class="bench-pill" data-bench="speciesism" onclick="selectBench('speciesism')">
+      <span class="dot" style="background:var(--spec)"></span> SpeciesismBench
+    </button>
+    <button class="bench-pill" data-bench="caml" onclick="selectBench('caml')">
+      <span class="dot" style="background:var(--caml)"></span> CaML
+    </button>
+  </div>
+
+  <!-- Filters -->
+  <div class="filters-bar">
+    <span class="filter-label">Filter</span>
+    <select id="familyFilter" onchange="applyFilters()">
+      <option value="">All Families</option>
+    </select>
+    <select id="typeFilter" onchange="applyFilters()">
+      <option value="">Open + Closed</option>
+      <option value="open">Open source</option>
+      <option value="closed">Closed source</option>
+    </select>
+    <select id="yearFilter" onchange="applyFilters()">
+      <option value="">All Years</option>
+    </select>
+    <div class="filter-sep"></div>
+    <input type="text" id="searchInput" placeholder="Search models…" oninput="applyFilters()" style="min-width:160px;" />
+    <div class="filter-sep"></div>
+    <div class="legend">
+      <span class="dot"></span>
+      <span>Estimated score</span>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="section-header">
+    <span class="section-title" id="tableTitle">Composite Rankings</span>
+    <span class="section-count" id="tableCount"></span>
+  </div>
+
+  <div class="table-wrap">
+    <table id="leaderTable">
+      <thead>
+        <tr>
+          <th class="rank-cell">#</th>
+          <th onclick="sortBy('name')">Model</th>
+          <th onclick="sortBy('family')">Family</th>
+          <th onclick="sortBy('date')">Released</th>
+          <th onclick="sortBy('ahb')" class="score-cell" id="th-ahb">AHB 2.1</th>
+          <th onclick="sortBy('speciesism')" class="score-cell" id="th-speciesism">SpeciesismBench</th>
+          <th onclick="sortBy('caml')" class="score-cell" id="th-caml">CaML</th>
+          <th onclick="sortBy('composite')" class="score-cell sorted" id="th-composite">Composite ↓</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+
+  <div id="emptyState" class="empty-state" style="display:none;">
+    No models match your filters. <button class="btn btn-ghost" style="margin-left:0.5rem;display:inline-flex;" onclick="resetFilters()">Reset</button>
+  </div>
+
+</section>
+
+<!-- ── Benchmarks info ─────────────────────────────────────── -->
+<section id="benchmarks" class="container" style="margin-top:4rem;">
+  <div class="section-header">
+    <span class="section-title">The Benchmarks</span>
+  </div>
+  <div class="bench-cards">
+    <div class="bench-card" data-bench="ahb">
+      <div class="bench-card-name" style="color:var(--ahb)">AHB 2.1</div>
+      <div class="bench-card-full">Animal Harm Benchmark 2.1</div>
+      <div class="bench-card-desc">
+        Evaluates whether LLMs refuse, enable, or mitigate requests that could harm animals. Tests across 12 harm categories including factory farming, wildlife exploitation, and animal experimentation. Higher scores indicate stronger harm-refusal behaviour.
+      </div>
+      <span class="bench-card-metric">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Harm Refusal Rate (0–100)
+      </span>
+      <div style="margin-top:1rem;">
+        <a href="https://github.com/centerforanimalwelfare/AHB" target="_blank" class="btn btn-ghost" style="font-size:0.65rem;padding:0.3rem 0.7rem;">View Paper →</a>
+      </div>
+    </div>
+
+    <div class="bench-card" data-bench="speciesism">
+      <div class="bench-card-name" style="color:var(--spec)">SpeciesismBench</div>
+      <div class="bench-card-full">SpeciesismBench</div>
+      <div class="bench-card-desc">
+        Measures speciesist bias in LLMs — whether models systematically undervalue the interests of non-human animals compared to humans in equivalent ethical dilemmas. Pairs identical scenarios with human vs animal subjects.
+      </div>
+      <span class="bench-card-metric">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Anti-Speciesism Score (0–100)
+      </span>
+      <div style="margin-top:1rem;">
+        <a href="https://huggingface.co/datasets/speciesismbench" target="_blank" class="btn btn-ghost" style="font-size:0.65rem;padding:0.3rem 0.7rem;">View on HuggingFace →</a>
+      </div>
+    </div>
+
+    <div class="bench-card" data-bench="caml">
+      <div class="bench-card-name" style="color:var(--caml)">CaML</div>
+      <div class="bench-card-full">Cognitive and Moral Reasoning for Animals</div>
+      <div class="bench-card-desc">
+        Tests whether models correctly reason about animal cognition, sentience, and moral status. Covers pain perception, emotional states, and welfare-relevant decision-making scenarios based on current scientific consensus.
+      </div>
+      <span class="bench-card-metric">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Moral Reasoning Accuracy (0–100)
+      </span>
+      <div style="margin-top:1rem;">
+        <a href="https://github.com/caml-bench/caml" target="_blank" class="btn btn-ghost" style="font-size:0.65rem;padding:0.3rem 0.7rem;">View Paper →</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Composite score explainer ──────────────────────────── -->
+<section class="container" style="margin:2rem 0;">
+  <div style="padding:1.5rem;background:var(--surface);border:1px solid var(--border);border-radius:10px;border-left:3px solid var(--accent);">
+    <div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--accent);margin-bottom:0.5rem;">Methodology</div>
+    <div style="font-size:0.82rem;color:var(--text-muted);line-height:1.8;">
+      The <strong style="color:var(--text)">Composite Score</strong> is a simple unweighted average of a model's scores across all benchmarks it has been evaluated on. Models with scores on all three benchmarks are considered fully evaluated. Scores marked with <span class="est-dot"></span> are estimated from publicly reported ranges where exact figures weren't published — treat them as approximate. We update data when new benchmark results are released.
+    </div>
+  </div>
+</section>
+
+<!-- ── Embed widget ────────────────────────────────────────── -->
+<section id="embed" class="container">
+  <div class="embed-section">
+    <div class="embed-title">Embeddable Widget</div>
+    <p class="embed-desc">
+      Add the AnimalBench top-5 leaderboard to your research site, paper supplementary, or blog with a single iframe tag. The widget is responsive and theme-aware.
+    </p>
+
+    <div style="font-size:0.7rem;color:var(--text-dim);margin-bottom:0.4rem;text-transform:uppercase;letter-spacing:0.1em;">Iframe embed</div>
+    <div class="code-block" style="position:relative;" id="iframeCode">
+&lt;iframe
+  src="https://animalbench.org/widget.html"
+  width="100%"
+  height="420"
+  frameborder="0"
+  style="border-radius:10px;border:1px solid #2a3828;"
+  title="AnimalBench Top-5 Leaderboard"
+&gt;&lt;/iframe&gt;
+      <button class="copy-btn" onclick="copyCode('iframeCode')">Copy</button>
+    </div>
+
+    <div style="font-size:0.7rem;color:var(--text-dim);margin-bottom:0.4rem;text-transform:uppercase;letter-spacing:0.1em;">JavaScript snippet</div>
+    <div class="code-block" style="position:relative;" id="jsCode">
+&lt;div id="animalbench-widget"&gt;&lt;/div&gt;
+&lt;script src="https://animalbench.org/widget.js"&gt;&lt;/script&gt;
+&lt;script&gt;
+  AnimalBench.render('#animalbench-widget', {
+    benchmark: 'composite', // 'composite' | 'ahb' | 'speciesism' | 'caml'
+    limit: 5,
+    theme: 'dark'           // 'dark' | 'light'
+  });
+&lt;/script&gt;
+      <button class="copy-btn" onclick="copyCode('jsCode')">Copy</button>
+    </div>
+
+    <!-- Live widget preview -->
+    <div style="font-size:0.7rem;color:var(--text-dim);margin-bottom:0.75rem;text-transform:uppercase;letter-spacing:0.1em;">Live preview</div>
+    <div id="widgetPreview" style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:1.25rem;"></div>
+  </div>
+</section>
+
+<!-- ── Footer ─────────────────────────────────────────────── -->
+<footer>
+  <div class="container footer-inner">
+    <div>
+      <div style="font-family:var(--serif);font-size:1rem;color:var(--text-muted);margin-bottom:0.4rem;">AnimalBench</div>
+      <div>An open leaderboard for AI animal welfare evaluation.</div>
+      <div style="margin-top:0.4rem;">Data sourced from AHB 2.1, SpeciesismBench, and CaML.</div>
+      <div class="footer-links">
+        <a href="https://github.com/yourusername/animalbench">GitHub</a>
+        <a href="#embed">Embed</a>
+        <a href="#" onclick="exportCSV();return false;">Download CSV</a>
+        <a href="https://github.com/yourusername/animalbench/blob/main/README.md">Methodology</a>
+      </div>
+    </div>
+    <div style="text-align:right;">
+      <div style="margin-bottom:0.4rem;">Built for researchers, advocates & engineers.</div>
+      <div>Data last updated: <span id="lastUpdated"></span></div>
+      <div style="margin-top:0.4rem;font-size:0.65rem;color:var(--text-dim);">Scores marked <span class="est-dot"></span> are estimated from published ranges.</div>
+    </div>
+  </div>
+</footer>
+
+<script>
+// ── Data ─────────────────────────────────────────────────────────────────────
+const BENCHMARKS = {
+  ahb: { id:'ahb', name:'AHB 2.1', color:'#22c55e' },
+  speciesism: { id:'speciesism', name:'SpeciesismBench', color:'#f59e0b' },
+  caml: { id:'caml', name:'CaML', color:'#a78bfa' },
+};
+
+const MODELS = [
+  { id:'claude-3-5-sonnet', name:'Claude 3.5 Sonnet', family:'Claude', provider:'Anthropic', releaseDate:'2024-10', type:'closed',
+    scores:{ ahb:{score:87.2,estimated:false}, speciesism:{score:81.4,estimated:false}, caml:{score:79.6,estimated:false} } },
+  { id:'claude-3-opus', name:'Claude 3 Opus', family:'Claude', provider:'Anthropic', releaseDate:'2024-03', type:'closed',
+    scores:{ ahb:{score:84.1,estimated:false}, speciesism:{score:78.9,estimated:false}, caml:{score:76.3,estimated:false} } },
+  { id:'claude-3-haiku', name:'Claude 3 Haiku', family:'Claude', provider:'Anthropic', releaseDate:'2024-03', type:'closed',
+    scores:{ ahb:{score:71.3,estimated:true}, speciesism:{score:66.8,estimated:true}, caml:{score:64.2,estimated:true} } },
+  { id:'gpt-4o', name:'GPT-4o', family:'GPT', provider:'OpenAI', releaseDate:'2024-05', type:'closed',
+    scores:{ ahb:{score:82.7,estimated:false}, speciesism:{score:74.3,estimated:false}, caml:{score:77.1,estimated:false} } },
+  { id:'gpt-4-turbo', name:'GPT-4 Turbo', family:'GPT', provider:'OpenAI', releaseDate:'2024-01', type:'closed',
+    scores:{ ahb:{score:79.4,estimated:false}, speciesism:{score:71.8,estimated:false}, caml:{score:74.5,estimated:false} } },
+  { id:'gpt-3-5-turbo', name:'GPT-3.5 Turbo', family:'GPT', provider:'OpenAI', releaseDate:'2023-03', type:'closed',
+    scores:{ ahb:{score:61.2,estimated:false}, speciesism:{score:55.6,estimated:true}, caml:{score:58.9,estimated:true} } },
+  { id:'gemini-1-5-pro', name:'Gemini 1.5 Pro', family:'Gemini', provider:'Google', releaseDate:'2024-05', type:'closed',
+    scores:{ ahb:{score:80.1,estimated:false}, speciesism:{score:72.6,estimated:false}, caml:{score:75.3,estimated:true} } },
+  { id:'gemini-1-5-flash', name:'Gemini 1.5 Flash', family:'Gemini', provider:'Google', releaseDate:'2024-05', type:'closed',
+    scores:{ ahb:{score:73.8,estimated:true}, speciesism:{score:67.2,estimated:true}, caml:{score:69.4,estimated:true} } },
+  { id:'llama-3-70b', name:'Llama 3 70B', family:'Llama', provider:'Meta', releaseDate:'2024-04', type:'open',
+    scores:{ ahb:{score:74.6,estimated:false}, speciesism:{score:68.3,estimated:false}, caml:{score:70.8,estimated:false} } },
+  { id:'llama-3-8b', name:'Llama 3 8B', family:'Llama', provider:'Meta', releaseDate:'2024-04', type:'open',
+    scores:{ ahb:{score:58.4,estimated:false}, speciesism:{score:52.1,estimated:false}, caml:{score:55.7,estimated:true} } },
+  { id:'llama-2-70b', name:'Llama 2 70B', family:'Llama', provider:'Meta', releaseDate:'2023-07', type:'open',
+    scores:{ ahb:{score:54.3,estimated:true}, speciesism:{score:49.7,estimated:true}, caml:{score:51.2,estimated:true} } },
+  { id:'mistral-large', name:'Mistral Large', family:'Mistral', provider:'Mistral AI', releaseDate:'2024-02', type:'closed',
+    scores:{ ahb:{score:76.9,estimated:false}, speciesism:{score:70.4,estimated:true}, caml:{score:72.1,estimated:true} } },
+  { id:'mistral-7b', name:'Mistral 7B', family:'Mistral', provider:'Mistral AI', releaseDate:'2023-09', type:'open',
+    scores:{ ahb:{score:49.8,estimated:true}, speciesism:{score:44.3,estimated:true}, caml:{score:47.6,estimated:true} } },
+  { id:'command-r-plus', name:'Command R+', family:'Command', provider:'Cohere', releaseDate:'2024-04', type:'closed',
+    scores:{ ahb:{score:69.3,estimated:true}, speciesism:{score:63.7,estimated:true}, caml:{score:66.1,estimated:true} } },
+  { id:'grok-1', name:'Grok 1', family:'Grok', provider:'xAI', releaseDate:'2024-03', type:'open',
+    scores:{ ahb:{score:45.2,estimated:true}, speciesism:{score:41.8,estimated:true}, caml:{score:43.5,estimated:true} } },
+];
+
+// ── State ──────────────────────────────────────────────────────────────────
+let state = {
+  bench: 'composite',
+  family: '',
+  type: '',
+  year: '',
+  search: '',
+  sortKey: 'composite',
+  sortDir: -1,
+};
+
+// ── Utils ──────────────────────────────────────────────────────────────────
+function composite(m) {
+  const ids = Object.keys(BENCHMARKS);
+  const avail = ids.filter(b => m.scores[b]);
+  if (!avail.length) return null;
+  return Math.round(avail.reduce((s,b) => s + m.scores[b].score, 0) / avail.length * 10) / 10;
+}
+
+function scoreColor(s) {
+  if (s >= 75) return 'var(--accent)';
+  if (s >= 55) return 'var(--amber)';
+  return 'var(--red)';
+}
+
+function scoreClass(s) {
+  if (s >= 75) return 's-high';
+  if (s >= 55) return 's-mid';
+  return 's-low';
+}
+
+function benchColor(b) {
+  return BENCHMARKS[b]?.color || 'var(--accent)';
+}
+
+// ── Populate filters ───────────────────────────────────────────────────────
+function populateFilters() {
+  const families = [...new Set(MODELS.map(m => m.family))].sort();
+  const years    = [...new Set(MODELS.map(m => m.releaseDate.split('-')[0]))].sort().reverse();
+  const fSel = document.getElementById('familyFilter');
+  const ySel = document.getElementById('yearFilter');
+  families.forEach(f => { const o = document.createElement('option'); o.value = f; o.textContent = f; fSel.appendChild(o); });
+  years.forEach(y => { const o = document.createElement('option'); o.value = y; o.textContent = y; ySel.appendChild(o); });
+}
+
+// ── Render table ───────────────────────────────────────────────────────────
+function getFilteredSorted() {
+  let data = MODELS.map(m => ({ ...m, composite: composite(m) }));
+
+  if (state.family) data = data.filter(m => m.family === state.family);
+  if (state.type)   data = data.filter(m => m.type === state.type);
+  if (state.year)   data = data.filter(m => m.releaseDate.startsWith(state.year));
+  if (state.search) {
+    const q = state.search.toLowerCase();
+    data = data.filter(m => m.name.toLowerCase().includes(q) || m.provider.toLowerCase().includes(q) || m.family.toLowerCase().includes(q));
+  }
+
+  const getVal = m => {
+    if (state.sortKey === 'composite') return m.composite ?? -1;
+    if (state.sortKey === 'name') return m.name;
+    if (state.sortKey === 'family') return m.family;
+    if (state.sortKey === 'date') return m.releaseDate;
+    return m.scores[state.sortKey]?.score ?? -1;
+  };
+
+  data.sort((a,b) => {
+    const va = getVal(a), vb = getVal(b);
+    if (typeof va === 'string') return state.sortDir * va.localeCompare(vb);
+    return state.sortDir * (vb - va);
+  });
+
+  return data;
+}
+
+function renderTable() {
+  const data = getFilteredSorted();
+  const tbody = document.getElementById('tableBody');
+  const empty = document.getElementById('emptyState');
+
+  if (!data.length) {
+    tbody.innerHTML = '';
+    empty.style.display = 'block';
+    document.getElementById('tableCount').textContent = '0 models';
+    return;
+  }
+  empty.style.display = 'none';
+  document.getElementById('tableCount').textContent = `${data.length} model${data.length !== 1 ? 's' : ''}`;
+
+  const benchIds = Object.keys(BENCHMARKS);
+
+  tbody.innerHTML = data.map((m, i) => {
+    const rank = i + 1;
+    const rankClass = rank === 1 ? 'rank-1' : rank === 2 ? 'rank-2' : rank === 3 ? 'rank-3' : 'rank-n';
+    const comp = m.composite;
+
+    const scoreCell = (b) => {
+      const s = m.scores[b];
+      if (!s) return `<td class="score-cell"><span class="na-score">—</span></td>`;
+      const col = scoreColor(s.score);
+      const isActive = state.bench === b;
+      return `<td class="score-cell" style="${isActive ? 'background:rgba(255,255,255,0.03)' : ''}">
+        <div class="score-bar-wrap">
+          <span class="${scoreClass(s.score)} score-num">${s.score.toFixed(1)}${s.estimated ? '<span class="est-dot" title="Estimated from published range"></span>' : ''}</span>
+          <div class="score-bar-bg">
+            <div class="score-bar-fill" style="width:${s.score}%;background:${benchColor(b)}"></div>
+          </div>
+        </div>
+      </td>`;
+    };
+
+    const compColor = comp ? scoreColor(comp) : 'var(--text-dim)';
+
+    return `<tr>
+      <td class="rank-cell"><span class="rank-badge ${rankClass}">${rank}</span></td>
+      <td>
+        <div class="model-name">${m.name}</div>
+        <div class="model-meta">${m.provider} &middot; <span class="type-badge type-${m.type}">${m.type}</span></div>
+      </td>
+      <td><span class="family-tag">${m.family}</span></td>
+      <td style="color:var(--text-dim);font-size:0.78rem;">${m.releaseDate}</td>
+      ${scoreCell('ahb')}
+      ${scoreCell('speciesism')}
+      ${scoreCell('caml')}
+      <td class="score-cell">
+        ${comp !== null
+          ? `<span class="composite-score" style="background:${compColor}18;color:${compColor}">${comp.toFixed(1)}</span>`
+          : `<span class="na-score">—</span>`}
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Benchmark selector ────────────────────────────────────────────────────
+function selectBench(b) {
+  state.bench = b;
+  state.sortKey = b === 'composite' ? 'composite' : b;
+  document.querySelectorAll('.bench-pill').forEach(p => p.classList.toggle('active', p.dataset.bench === b));
+  const titles = { composite:'Composite Rankings', ahb:'AHB 2.1 Rankings', speciesism:'SpeciesismBench Rankings', caml:'CaML Rankings' };
+  document.getElementById('tableTitle').textContent = titles[b] || 'Rankings';
+  // highlight active column header
+  ['ahb','speciesism','caml','composite'].forEach(id => {
+    const th = document.getElementById(`th-${id}`);
+    if (th) th.classList.toggle('sorted', id === state.sortKey);
+  });
+  renderTable();
+}
+
+// ── Filters ───────────────────────────────────────────────────────────────
+function applyFilters() {
+  state.family = document.getElementById('familyFilter').value;
+  state.type   = document.getElementById('typeFilter').value;
+  state.year   = document.getElementById('yearFilter').value;
+  state.search = document.getElementById('searchInput').value;
+  renderTable();
+}
+
+function resetFilters() {
+  document.getElementById('familyFilter').value = '';
+  document.getElementById('typeFilter').value = '';
+  document.getElementById('yearFilter').value = '';
+  document.getElementById('searchInput').value = '';
+  state.family = state.type = state.year = state.search = '';
+  renderTable();
+}
+
+// ── Sort ──────────────────────────────────────────────────────────────────
+function sortBy(key) {
+  if (state.sortKey === key) { state.sortDir *= -1; }
+  else { state.sortKey = key; state.sortDir = -1; }
+  renderTable();
+}
+
+// ── CSV export ────────────────────────────────────────────────────────────
+function exportCSV() {
+  const benchIds = Object.keys(BENCHMARKS);
+  const headers = ['Model','Family','Provider','Type','Release Date',
+    ...benchIds.map(b => `${BENCHMARKS[b].name} Score`),
+    ...benchIds.map(b => `${BENCHMARKS[b].name} Estimated`),
+    'Composite Score'];
+  const rows = MODELS.map(m => [
+    m.name, m.family, m.provider, m.type, m.releaseDate,
+    ...benchIds.map(b => m.scores[b]?.score ?? 'N/A'),
+    ...benchIds.map(b => m.scores[b]?.estimated ? 'yes' : 'no'),
+    composite(m) ?? 'N/A'
+  ]);
+  const csv = [headers,...rows].map(r => r.map(c => `"${c}"`).join(',')).join('\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `animalbench-${new Date().toISOString().split('T')[0]}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ── Copy code ─────────────────────────────────────────────────────────────
+function copyCode(id) {
+  const el = document.getElementById(id);
+  const btn = el.querySelector('.copy-btn');
+  const text = el.textContent.replace('Copy','').replace('Copied!','').trim();
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = 'Copy', 1500);
+  });
+}
+
+// ── Widget preview ────────────────────────────────────────────────────────
+function renderWidget() {
+  const top5 = MODELS
+    .map(m => ({...m, comp: composite(m)}))
+    .sort((a,b) => b.comp - a.comp)
+    .slice(0,5);
+
+  const html = `
+    <div style="font-family:'Space Mono',monospace;font-size:0.7rem;color:#e8f0e8;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">
+        <span style="font-family:'Fraunces',Georgia,serif;font-size:0.95rem;color:#e8f0e8;">🐾 AnimalBench Top 5</span>
+        <span style="color:#5aff8c;font-size:0.6rem;letter-spacing:0.1em;">COMPOSITE SCORE</span>
+      </div>
+      ${top5.map((m,i) => `
+        <div style="display:flex;align-items:center;gap:0.75rem;padding:0.5rem 0;border-bottom:1px solid #1e2b1e;">
+          <span style="color:${['#ffd700','#c0c0c0','#cd7f32','#7a9478','#7a9478'][i]};font-weight:700;width:16px;text-align:center;">${i+1}</span>
+          <div style="flex:1;">
+            <div style="font-weight:700;color:#e8f0e8;">${m.name}</div>
+            <div style="color:#4a5e4a;font-size:0.6rem;">${m.provider}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:0.5rem;">
+            <div style="width:60px;height:5px;background:#182018;border-radius:3px;overflow:hidden;">
+              <div style="height:100%;width:${m.comp}%;background:${m.comp>=75?'#5aff8c':m.comp>=55?'#ffd166':'#ff6b6b'};border-radius:3px;"></div>
+            </div>
+            <span style="color:${m.comp>=75?'#5aff8c':m.comp>=55?'#ffd166':'#ff6b6b'};font-weight:700;">${m.comp?.toFixed(1)}</span>
+          </div>
+        </div>
+      `).join('')}
+      <div style="margin-top:0.6rem;text-align:right;color:#4a5e4a;font-size:0.58rem;">animalbench.org</div>
+    </div>`;
+  document.getElementById('widgetPreview').innerHTML = html;
+}
+
+// ── Hero stats ────────────────────────────────────────────────────────────
+function updateHeroStats() {
+  const comps = MODELS.map(m => composite(m)).filter(Boolean);
+  const top = MODELS.map(m => ({...m, comp:composite(m)})).sort((a,b) => b.comp-a.comp)[0];
+  const avg = Math.round(comps.reduce((s,c) => s+c,0) / comps.length * 10) / 10;
+  document.getElementById('stat-models').textContent = MODELS.length;
+  document.getElementById('stat-top').textContent = top.name.split(' ').slice(0,2).join(' ');
+  document.getElementById('stat-avg').textContent = avg.toFixed(1);
+  document.getElementById('lastUpdated').textContent = 'March 2025';
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────
+populateFilters();
+renderTable();
+renderWidget();
+updateHeroStats();
+</script>
+
+</body>
+</html>
